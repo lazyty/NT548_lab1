@@ -1,0 +1,355 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'NT548 - AWS Infrastructure with VPC, EC2, and Security Groups'
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: CIDR block for VPC
+    
+  PublicSubnetCidr:
+    Type: String
+    Default: '10.0.1.0/24'
+    Description: CIDR block for public subnet
+    
+  PrivateSubnetCidr:
+    Type: String
+    Default: '10.0.2.0/24'
+    Description: CIDR block for private subnet
+    
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Availability zone for subnets
+    
+  AllowedSshIp:
+    Type: String
+    Default: '0.0.0.0/0'
+    Description: IP address allowed to SSH to public EC2 (change for security)
+    
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of AWS key pair for EC2 instances
+    
+  InstanceType:
+    Type: String
+    Default: 't2.micro'
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: EC2 instance type
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: Latest Amazon Linux 2 AMI ID
+
+Resources:
+  # VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: NT548-VPC-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: NT548-IGW-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Attach Internet Gateway to VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCidr
+      AvailabilityZone: !Ref AvailabilityZone
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: NT548-Public-Subnet-CF
+        - Key: Type
+          Value: Public
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Private Subnet
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnetCidr
+      AvailabilityZone: !Ref AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: NT548-Private-Subnet-CF
+        - Key: Type
+          Value: Private
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Elastic IP for NAT Gateway
+  NATGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: NT548-NAT-EIP-CF
+
+  # NAT Gateway
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NATGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: NT548-NAT-Gateway-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Public Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: NT548-Public-RT-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Public Route
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  # Associate Public Subnet with Public Route Table
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # Private Route Table
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: NT548-Private-RT-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Private Route
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref NATGateway
+
+  # Associate Private Subnet with Private Route Table
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Public EC2 Security Group
+  PublicEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for public EC2 instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSshIp
+          Description: SSH from allowed IP
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+          Description: HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '0.0.0.0/0'
+          Description: HTTPS
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: '0.0.0.0/0'
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: NT548-Public-EC2-SG-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Private EC2 Security Group
+  PrivateEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for private EC2 instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref PublicEC2SecurityGroup
+          Description: SSH from public EC2
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref PublicEC2SecurityGroup
+          Description: HTTP from public EC2
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref PublicEC2SecurityGroup
+          Description: HTTPS from public EC2
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref PublicEC2SecurityGroup
+          Description: Custom app port from public EC2
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: '0.0.0.0/0'
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: NT548-Private-EC2-SG-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Public EC2 Instance
+  PublicEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref PublicEC2SecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<h1>NT548 Public EC2 Instance (CloudFormation)</h1>" > /var/www/html/index.html
+          echo "<p>This is the public EC2 instance in the public subnet.</p>" >> /var/www/html/index.html
+          echo "<p>Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p>" >> /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: NT548-Public-EC2-CF
+        - Key: Type
+          Value: Public
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+  # Private EC2 Instance
+  PrivateEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref PrivateSubnet
+      SecurityGroupIds:
+        - !Ref PrivateEC2SecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<h1>NT548 Private EC2 Instance (CloudFormation)</h1>" > /var/www/html/index.html
+          echo "<p>This is the private EC2 instance in the private subnet.</p>" >> /var/www/html/index.html
+          echo "<p>Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p>" >> /var/www/html/index.html
+          echo "<p>This instance can only be accessed from the public instance.</p>" >> /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: NT548-Private-EC2-CF
+        - Key: Type
+          Value: Private
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
+Outputs:
+  VPCId:
+    Description: ID of the VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPC-ID"
+
+  PublicSubnetId:
+    Description: ID of the public subnet
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-Public-Subnet-ID"
+
+  PrivateSubnetId:
+    Description: ID of the private subnet
+    Value: !Ref PrivateSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-Private-Subnet-ID"
+
+  InternetGatewayId:
+    Description: ID of the Internet Gateway
+    Value: !Ref InternetGateway
+    Export:
+      Name: !Sub "${AWS::StackName}-IGW-ID"
+
+  NATGatewayId:
+    Description: ID of the NAT Gateway
+    Value: !Ref NATGateway
+    Export:
+      Name: !Sub "${AWS::StackName}-NAT-Gateway-ID"
+
+  PublicEC2IP:
+    Description: Public IP of the public EC2 instance
+    Value: !GetAtt PublicEC2Instance.PublicIp
+
+  PrivateEC2IP:
+    Description: Private IP of the private EC2 instance
+    Value: !GetAtt PrivateEC2Instance.PrivateIp
+
+  PublicSecurityGroupId:
+    Description: ID of the public security group
+    Value: !Ref PublicEC2SecurityGroup
+
+  PrivateSecurityGroupId:
+    Description: ID of the private security group
+    Value: !Ref PrivateEC2SecurityGroup
