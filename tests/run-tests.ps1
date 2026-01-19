@@ -27,17 +27,17 @@ function Test-VPC {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($VpcId)) {
-        Write-Host "❌ VPC ID not found in Terraform outputs" -ForegroundColor $Red
+        Write-Host "[ERROR] VPC ID not found in Terraform outputs" -ForegroundColor $Red
         return $false
     }
     
     # Check if VPC exists
     $result = aws ec2 describe-vpcs --vpc-ids $VpcId --query 'Vpcs[0].State' --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and $result -eq "available") {
-        Write-Host "✅ VPC exists and is available" -ForegroundColor $Green
+        Write-Host "[OK] VPC exists and is available" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ VPC not found or not available" -ForegroundColor $Red
+        Write-Host "[ERROR] VPC not found or not available" -ForegroundColor $Red
         return $false
     }
 }
@@ -60,26 +60,26 @@ function Test-Subnets {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($PublicSubnetId) -or [string]::IsNullOrEmpty($PrivateSubnetId)) {
-        Write-Host "❌ Subnet IDs not found in Terraform outputs" -ForegroundColor $Red
+        Write-Host "[ERROR] Subnet IDs not found in Terraform outputs" -ForegroundColor $Red
         return $false
     }
     
     # Test public subnet
     $publicState = aws ec2 describe-subnets --subnet-ids $PublicSubnetId --query 'Subnets[0].State' --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and $publicState -eq "available") {
-        Write-Host "✅ Public subnet is available" -ForegroundColor $Green
+        Write-Host "[OK] Public subnet is available" -ForegroundColor $Green
     } else {
-        Write-Host "❌ Public subnet not available" -ForegroundColor $Red
+        Write-Host "[ERROR] Public subnet not available" -ForegroundColor $Red
         return $false
     }
     
     # Test private subnet
     $privateState = aws ec2 describe-subnets --subnet-ids $PrivateSubnetId --query 'Subnets[0].State' --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and $privateState -eq "available") {
-        Write-Host "✅ Private subnet is available" -ForegroundColor $Green
+        Write-Host "[OK] Private subnet is available" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ Private subnet not available" -ForegroundColor $Red
+        Write-Host "[ERROR] Private subnet not available" -ForegroundColor $Red
         return $false
     }
 }
@@ -99,16 +99,16 @@ function Test-InternetGateway {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($IgwId)) {
-        Write-Host "❌ Internet Gateway ID not found" -ForegroundColor $Red
+        Write-Host "[ERROR] Internet Gateway ID not found" -ForegroundColor $Red
         return $false
     }
     
     $igwState = aws ec2 describe-internet-gateways --internet-gateway-ids $IgwId --query 'InternetGateways[0].State' --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and $igwState -eq "available") {
-        Write-Host "✅ Internet Gateway is available" -ForegroundColor $Green
+        Write-Host "[OK] Internet Gateway is available" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ Internet Gateway not available" -ForegroundColor $Red
+        Write-Host "[ERROR] Internet Gateway not available" -ForegroundColor $Red
         return $false
     }
 }
@@ -128,16 +128,16 @@ function Test-NATGateway {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($NatId)) {
-        Write-Host "❌ NAT Gateway ID not found" -ForegroundColor $Red
+        Write-Host "[ERROR] NAT Gateway ID not found" -ForegroundColor $Red
         return $false
     }
     
     $natState = aws ec2 describe-nat-gateways --nat-gateway-ids $NatId --query 'NatGateways[0].State' --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and $natState -eq "available") {
-        Write-Host "✅ NAT Gateway is available" -ForegroundColor $Green
+        Write-Host "[OK] NAT Gateway is available" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ NAT Gateway not available (State: $natState)" -ForegroundColor $Red
+        Write-Host "[ERROR] NAT Gateway not available (State: $natState)" -ForegroundColor $Red
         return $false
     }
 }
@@ -160,7 +160,7 @@ function Test-EC2Instances {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($PublicIp) -or [string]::IsNullOrEmpty($PrivateIp)) {
-        Write-Host "❌ EC2 IPs not found in Terraform outputs" -ForegroundColor $Red
+        Write-Host "[ERROR] EC2 IPs not found in Terraform outputs" -ForegroundColor $Red
         return $false
     }
     
@@ -172,12 +172,12 @@ function Test-EC2Instances {
     try {
         $response = Invoke-WebRequest -Uri "http://$PublicIp" -TimeoutSec 10 -ErrorAction Stop
         if ($response.StatusCode -eq 200) {
-            Write-Host "✅ Public EC2 HTTP service is reachable" -ForegroundColor $Green
+            Write-Host "[OK] Public EC2 HTTP service is reachable" -ForegroundColor $Green
             return $true
         }
     }
     catch {
-        Write-Host "⚠️  Public EC2 HTTP service not reachable (may still be starting)" -ForegroundColor $Yellow
+        Write-Host "[WARNING] Public EC2 HTTP service not reachable (may still be starting)" -ForegroundColor $Yellow
         return $true  # Don't fail the test, instance might still be starting
     }
     
@@ -199,7 +199,7 @@ function Test-RouteTables {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($VpcId)) {
-        Write-Host "❌ VPC ID not found for route table testing" -ForegroundColor $Red
+        Write-Host "[ERROR] VPC ID not found for route table testing" -ForegroundColor $Red
         return $false
     }
     
@@ -207,7 +207,7 @@ function Test-RouteTables {
     $routeTables = aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VpcId" --query 'RouteTables[*].[RouteTableId,Tags[?Key==`Name`].Value|[0]]' --output text 2>$null
     
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Failed to retrieve route tables" -ForegroundColor $Red
+        Write-Host "[ERROR] Failed to retrieve route tables" -ForegroundColor $Red
         return $false
     }
     
@@ -221,20 +221,20 @@ function Test-RouteTables {
             $rtName = $parts[1]
             if ($rtName -like "*Public*") {
                 $publicRTFound = $true
-                Write-Host "✅ Public Route Table found: $($parts[0])" -ForegroundColor $Green
+                Write-Host "[OK] Public Route Table found: $($parts[0])" -ForegroundColor $Green
             }
             elseif ($rtName -like "*Private*") {
                 $privateRTFound = $true
-                Write-Host "✅ Private Route Table found: $($parts[0])" -ForegroundColor $Green
+                Write-Host "[OK] Private Route Table found: $($parts[0])" -ForegroundColor $Green
             }
         }
     }
     
     if ($publicRTFound -and $privateRTFound) {
-        Write-Host "✅ Both Public and Private Route Tables exist" -ForegroundColor $Green
+        Write-Host "[OK] Both Public and Private Route Tables exist" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ Missing route tables - Public: $publicRTFound, Private: $privateRTFound" -ForegroundColor $Red
+        Write-Host "[ERROR] Missing route tables - Public: $publicRTFound, Private: $privateRTFound" -ForegroundColor $Red
         return $false
     }
 }
@@ -254,7 +254,7 @@ function Test-DefaultSecurityGroup {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($VpcId)) {
-        Write-Host "❌ VPC ID not found for default SG testing" -ForegroundColor $Red
+        Write-Host "[ERROR] VPC ID not found for default SG testing" -ForegroundColor $Red
         return $false
     }
     
@@ -262,10 +262,10 @@ function Test-DefaultSecurityGroup {
     $defaultSG = aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VpcId" "Name=group-name,Values=default" --query 'SecurityGroups[0].GroupId' --output text 2>$null
     
     if ($LASTEXITCODE -eq 0 -and $defaultSG -ne "None" -and ![string]::IsNullOrEmpty($defaultSG)) {
-        Write-Host "✅ Default Security Group exists: $defaultSG" -ForegroundColor $Green
+        Write-Host "[OK] Default Security Group exists: $defaultSG" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ Default Security Group not found" -ForegroundColor $Red
+        Write-Host "[ERROR] Default Security Group not found" -ForegroundColor $Red
         return $false
     }
 }
@@ -287,26 +287,26 @@ function Test-SecurityGroupRules {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($PublicSgId) -or [string]::IsNullOrEmpty($PrivateSgId)) {
-        Write-Host "❌ Security Group IDs not found" -ForegroundColor $Red
+        Write-Host "[ERROR] Security Group IDs not found" -ForegroundColor $Red
         return $false
     }
     
     # Test Public SG rules (should have SSH port 22)
     $publicRules = aws ec2 describe-security-groups --group-ids $PublicSgId --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]' --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and ![string]::IsNullOrEmpty($publicRules)) {
-        Write-Host "✅ Public Security Group has SSH rule (port 22)" -ForegroundColor $Green
+        Write-Host "[OK] Public Security Group has SSH rule (port 22)" -ForegroundColor $Green
     } else {
-        Write-Host "❌ Public Security Group missing SSH rule" -ForegroundColor $Red
+        Write-Host "[ERROR] Public Security Group missing SSH rule" -ForegroundColor $Red
         return $false
     }
     
     # Test Private SG rules (should reference public SG)
     $privateRules = aws ec2 describe-security-groups --group-ids $PrivateSgId --query "SecurityGroups[0].IpPermissions[?UserIdGroupPairs[?GroupId=='$PublicSgId']]" --output text 2>$null
     if ($LASTEXITCODE -eq 0 -and ![string]::IsNullOrEmpty($privateRules)) {
-        Write-Host "✅ Private Security Group allows access from Public SG" -ForegroundColor $Green
+        Write-Host "[OK] Private Security Group allows access from Public SG" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "❌ Private Security Group missing rules from Public SG" -ForegroundColor $Red
+        Write-Host "[ERROR] Private Security Group missing rules from Public SG" -ForegroundColor $Red
         return $false
     }
 }
@@ -319,13 +319,13 @@ function Main {
     # Check if AWS CLI is configured
     $null = aws sts get-caller-identity 2>$null
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ AWS CLI not configured or no valid credentials" -ForegroundColor $Red
+        Write-Host "[ERROR] AWS CLI not configured or no valid credentials" -ForegroundColor $Red
         exit 1
     }
     
     # Check if Terraform state exists
     if (-not (Test-Path "../terraform/terraform.tfstate")) {
-        Write-Host "❌ Terraform state file not found. Please run 'terraform apply' first." -ForegroundColor $Red
+        Write-Host "[ERROR] Terraform state file not found. Please run 'terraform apply' first." -ForegroundColor $Red
         exit 1
     }
     
@@ -359,10 +359,10 @@ function Main {
     # Summary
     Write-Host "=== Test Summary ===" -ForegroundColor $Blue
     if ($FailedTests -eq 0) {
-        Write-Host "✅ All tests passed!" -ForegroundColor $Green
+        Write-Host "[OK] All tests passed!" -ForegroundColor $Green
         Write-Host "Infrastructure is deployed and working correctly."
     } else {
-        Write-Host "❌ $FailedTests test(s) failed" -ForegroundColor $Red
+        Write-Host "[ERROR] $FailedTests test(s) failed" -ForegroundColor $Red
         Write-Host "Please check the infrastructure deployment."
         exit 1
     }

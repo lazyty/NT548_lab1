@@ -38,3 +38,20 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+# Documentation & Instructions (local files)
+HUONG_DAN_KIEM_TRA.txt
+
+# SSH Keys & Credentials
+*.pem
+*.key
+nt548-keypair.pem
+*.pub
+!*.pub.example
+
+# Terraform outputs
+*.tfstate.backup
+terraform.tfstate
+
+# Test results
+test-results/
+*.test.log
