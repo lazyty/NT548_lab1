@@ -17,7 +17,7 @@
   },
   {
     "ParameterKey": "AllowedSshIp",
-    "ParameterValue": "0.0.0.0/0"
+    "ParameterValue": "YOUR_IP_ADDRESS/32"
   },
   {
     "ParameterKey": "KeyPairName",
