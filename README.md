@@ -174,17 +174,20 @@ notepad terraform.tfvars
 #   - allowed_ssh_ip = "YOUR_IP_ADDRESS/32"  (IP của bạn từ bước 1.3)
 #   - key_pair_name = "nt548-keypair"        (tên key pair từ bước 1.2)
 
-# Bước 4: Kiểm tra variables
+# Bước 4: Khởi tạo thư mục làm việc của Terraform
+terraform init
+
+# Bước 5: Kiểm tra variables
 terraform validate
 
-# Bước 5: Dự tính chi phí
+# Bước 6: Dự tính chi phí
 terraform plan
 
-# Bước 6: Triển khai
+# Bước 7: Triển khai
 terraform apply
 # Nhập "yes" khi được hỏi
 
-# Bước 7: Lấy outputs
+# Bước 8: Lấy outputs
 terraform output
 ```
 
