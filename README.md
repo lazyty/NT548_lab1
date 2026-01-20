@@ -325,7 +325,7 @@ aws cloudformation describe-stacks --stack-name $StackName --query 'Stacks[0].Ou
 ## Cấu trúc project
 
 ```
-LAB2_NT548/
+LAB1_NT548/
 ├── terraform/
 │   ├── main.tf                 # Khai báo modules
 │   ├── variables.tf            # Variables chính
